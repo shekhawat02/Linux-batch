@@ -1,0 +1,31 @@
+Would you like to explore how Target Tracking Scaling handles different types of metrics, like requests per second instead of CPU?
+
+  To apply stress to an Ubuntu system for testing and then reduce it, follow these steps:
+1. Install the stress-ng tool:
+Code
+
+sudo apt update
+sudo apt install stress-ng
+2. Apply Stress:
+stress-ng offers various options to stress different system components. Here are some common examples:
+CPU Stress: To stress 4 CPU cores for 60 seconds:
+Code
+
+    stress-ng --cpu 4 --timeout 60s
+Memory Stress: To allocate and stress 1GB of virtual memory:
+Code
+
+    stress-ng --vm 1 --vm-bytes 1G --timeout 60s
+I/O Stress: To create 2 I/O stressors for 60 seconds:
+Code
+
+    stress-ng --io 2 --timeout 60s
+Combined Stress: To run with 4 CPU stressors, 2 I/O stressors, and 1 VM stressor using 1GB of virtual memory for 60 seconds: 
+Code
+
+    stress-ng --cpu 4 --io 2 --vm 1 --vm-bytes 1G --timeout 60s
+
+3. Reduce Stress:
+Once the stress-ng command completes (either by reaching its timeout or by being manually interrupted), the stress on the system will automatically cease. The stress-ng process will terminate, and the resources it was consuming will be released.
+If stress-ng is running in the foreground, it will exit after the specified --timeout duration.
+To manually stop a running stress-ng process before its timeout, press Ctrl+C in the terminal where it is executing. This will send an interrupt signal to the process, causing it to terminate and release system resources.
