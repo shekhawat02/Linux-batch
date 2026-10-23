@@ -1,0 +1,118 @@
+In Linux, pts stands for Pseudo-Terminal Slave. It represents a software-emulated terminal connection, unlike a standard physical or virtual console (tty). [1] (https://unix.stackexchange.com/questions/335992/what-is-the-difference-between-pts-and-tty-and-0), [2] (https://www.golinuxcloud.com/difference-between-pty-vs-tty-vs-pts-linux/)
+Whenever you open a graphical terminal emulator (like GNOME Terminal, xterm, or Alacritty) or log into a system remotely (via SSH or tmux), the system dynamically allocates a pts device file, such as /dev/pts/0, /dev/pts/1, etc. [1] (https://man7.org/linux/man-pages/man4/pts.4.html), [2] (https://biriukov.dev/docs/fd-pipe-session-terminal/4-terminals-and-pseudoterminals/), [3] (https://www.golinuxcloud.com/difference-between-pty-vs-tty-vs-pts-linux/)
+
+How pts Works: The Master/Slave Pair
+
+A pseudo-terminal (pty) always acts as a bidirectional pair consisting of a Master and a Slave: [1] (https://unix.stackexchange.com/questions/21280/difference-between-pts-and-tty), [2] (https://man7.org/linux/man-pages/man4/pts.4.html)
+1. The Multiplexer (/dev/ptmx): When an application (like an SSH server or terminal emulator) wants to create a new session, it opens the master multiplexer device /dev/ptmx. [1] (https://unix.stackexchange.com/questions/21280/difference-between-pts-and-tty), [2] (https://man7.org/linux/man-pages/man4/pts.4.html)
+2. The Slave (/dev/pts/X): The system automatically generates a corresponding slave file inside the /dev/pts/ directory. [1] (https://man7.org/linux/man-pages/man4/pts.4.html), [2] (https://unix.stackexchange.com/questions/21280/difference-between-pts-and-tty)
+3. Data Flow: The application (like sshd) interacts directly with the Master. Your interactive shell (like bash) interacts with the Slave. Data written to the slave is sent to the master as input, and vice versa. [1] (https://unix.stackexchange.com/questions/335992/what-is-the-difference-between-pts-and-tty-and-0), [2] (https://man7.org/linux/man-pages/man4/pts.4.html)
+
+Difference Between tty and pts
+
+
+Feature	tty (Teletype / Teleprinter)	pts (Pseudo-Terminal Slave)
+Nature	Physical or Core Virtual Terminal	Emulated Software Terminal
+Typical Path	/dev/tty1, /dev/tty2, etc.	/dev/pts/0, /dev/pts/1, etc.
+Triggered By	Direct native console access (e.g., Ctrl+Alt+F3)	SSH sessions, terminal tabs, tmux/screen
+
+
+Useful Commands to Interact with pts
+
+• Identify your current terminal: Running tty outputs the path of the specific pseudo-terminal assigned to your current shell: [1] (https://medium.com/@M4verick/how-i-went-from-confused-to-confident-understanding-ttys-ptys-ssh-and-tmux-d34252c0e452), [2] (https://www.youtube.com/watch?v=moYrdwBovak)
+bash
+tty
+# Output: /dev/pts/2
+Use code with caution.
+• See who is logged into which terminal: The who or w commands will list active users alongside their designated pts line: [1] (https://medium.com/@M4verick/how-i-went-from-confused-to-confident-understanding-ttys-ptys-ssh-and-tmux-d34252c0e452), [2] (https://www.youtube.com/watch?v=moYrdwBovak)
+bash
+w
+# Output shows USER, TTY (e.g., pts/0), FROM, LOGIN@, etc.
+Use code with caution.
+• View processes running under a specific terminal:bash
+ps -t pts/2
+Use code with caution.
+• Send a text message directly to another terminal window: If you open two terminal windows (say pts/0 and pts/1), you can send text from one to the other by redirecting output: [1] (https://unix.stackexchange.com/questions/93531/what-is-stored-in-dev-pts-files-and-can-we-open-them)
+bash
+echo "Hello from the other side!" > /dev/pts/1
+Use code with caution.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+***********************************************************
+
+1. Managing SSH PTY Allocation
+
+When running non-interactive scripts over SSH, you often need to manually change how pseudo-terminals behave.
+• Force PTY Allocation (-t): Use this when a remote command requires an interactive interface (like running sudo or top), but SSH refuses to create a PTY because it detects it is part of a script.bash
+ssh -t user@remote_host "sudo apt update"
+Use code with caution.
+Note: Use -tt to force a PTY even if SSH has no local terminal attached.
+• Disable PTY Allocation (-T): Use this for pure background scripts, automated file transfers, or port forwarding where an interactive prompt is unnecessary or could cause errors.bash
+ssh -T user@remote_host < local_script.sh
+Use code with caution.
+
+2. Terminating Stuck pts User Sessions
+
+If a remote user or a background process gets frozen or hangs up without properly disconnecting, you can force-close that specific pts session.
+1. Identify the Target Session: Run w or who to find the exact pts number and the process ID (PID) of the shell running on it.bash
+w
+Use code with caution.
+2. Find the Shell's Process ID: Look up the PID associated with that specific terminal.bash
+ps -t pts/1 -o pid,comm
+Use code with caution.
+3. Kill the Session: Terminate the parent process (usually bash or sshd) running on that terminal. Start with a standard terminate signal (SIGTERM), and resort to a forced kill (SIGKILL) if it remains unresponsive.bash
+# Polite kill (gives the shell a chance to close cleanly)
+kill 15 <PID>
+
+# Forced kill (instantly drops the connection)
+kill -9 <PID>
+
+
+***************************************************
+
+In your first terminal window, type this short command and press Enter:
+bash
+tty
+Use code with caution.
+It will output something like /dev/pts/0. That number at the end is your current terminal's secret ID.
+Now, go to your second terminal window and type the same thing:
+bash
+tty
+Use code with caution.
+This one will show a different number, like /dev/pts/1.
+
+Step 2: Send a Secret Message Between Screens
+
+We are going to use the first window to beam a message directly into the second window.
+In your first terminal, type the following command (make sure to replace /dev/pts/1 with whatever number your second window actually showed):
+bash
+echo "Hello from the other screen!" > /dev/pts/1
+Use code with caution.
+Press Enter, and look at your second window—the text will instantly pop up there as if by magic!
+
+**********************************************************************
+
+You will see and use these two terms in very different situations depending on how you are interacting with Linux.
+
+When pts is Used
+
+You deal with pts automatically 99% of the time during normal daily use. The system generates it whenever a software layer sits between you and the operating system.
+• Opening Terminal Apps: Every time you open a terminal window inside a desktop environment (like GNOME Terminal, Konsole, or iTerm).
+• Remote Connections: When you log into a remote server via SSH.
+• Terminal Multiplexers: When using tools like tmux or screen, each new split or pane gets its own pts device.
+• When to type it: You use the pts path (e.g., /dev/pts/3) when you want to target a specific user session to send them a message or kill a stuck shell.
+
+When You Have to Use tty
+
+You use tty when dealing with the core, raw operating system interface, bypassing the graphical interface entirely.
+• System Recovery: If your desktop environment crashes or freezes completely, you can press Ctrl + Alt + F3 (through F6) to drop into a raw text-only screen. This is a direct physical console, managed by /dev/tty3.
+• Embedded Hardware: If you connect directly to a server or a microcomputer (like a Raspberry Pi) using a physical serial cable or a monitor plugged straight into the motherboard.
+• Scripting Security: In shell scripts, the term tty is used as a command or flag to check if a human is actively typing into the script ([ -t 0 ]), or if the script is just running blindly in the background.
+
+Summary Table
+
+If you are doing this...	                         ...you are using pts	...you are using tty
+Coding in a standard window on your desktop	                X	
+Fixing a crashed Ubuntu server with no graphics		                                 X
+Running automation tasks via SSH	                          X	
+Connecting a serial cable to a networking switch		                               X
