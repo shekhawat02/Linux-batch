@@ -1,0 +1,42 @@
+
+PuTTY Power User Quick Guide
+
+
+📂 1. Save Your Session
+
+Stop re-typing your IP address every time you connect.
+• Configure: Enter your IP address, Port 22, and select SSH.
+• Name: Go to Saved Sessions, type a nickname (e.g., Production-Server).
+• Save: Click the Save button.
+• Launch: Double-click the saved name next time to connect instantly.
+
+📝 2. Turn on Session Logging
+
+Automatically save everything printed on your terminal screen to a local text file.
+• Navigate: Go to Session ➔ Logging in the left menu.
+• Enable: Select All session output.
+• Path: Click Browse next to Log file name to choose where to save the .log file on your computer.
+• Lock it in: Go back to Session, select your saved session, and click Save.
+
+🔑 3. Set Up Passwordless SSH Keys
+
+Log in instantly and securely without typing a password.
+
+Part A: Generate the Keys
+
+• Run: Open PuTTYgen (installed alongside PuTTY).
+• Create: Click Generate and wiggle your mouse in the blank space.
+• Save Private: Click Save private key (saves as a .ppk file). Keep this file safe and private.
+• Copy Public: Copy the long text block in the box at the top starting with ssh-rsa.
+
+Part B: Authorize on Server
+
+• Log In: Connect to your server with your regular password one last time.
+• Edit File: Run nano ~/.ssh/authorized_keys
+• Paste: Paste the copied public key text onto a new line. Save and exit (Ctrl+O, Enter, Ctrl+X).
+
+Part C: Link to PuTTY
+
+• Load Key: In PuTTY, go to Connection ➔ SSH ➔ Auth ➔ Credentials.
+• Browse: Select your saved .ppk private key file.
+• Save Session: Go back to Session, select your saved profile, and click Save.
