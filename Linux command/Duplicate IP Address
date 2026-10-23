@@ -1,0 +1,14 @@
+Q: Why do both virtual machines (VMs) have the same IP address, and how can I fix it?
+
+A: Both VMs may have the same IP address due to cloned network settings, duplicate MAC addresses, or identical static IP configurations.
+
+Solution:
+
+1. Generate a unique MAC address for the second VM.
+2. Check and assign a unique static IP if needed.
+3. Renew the DHCP lease using:
+   ```
+   sudo dhclient -r
+   sudo dhclient
+   ```
+4. Ensure both VMs have unique network configurations.
