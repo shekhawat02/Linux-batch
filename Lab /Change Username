@@ -1,0 +1,224 @@
+To change a username in **Red Hat Enterprise Linux 9**, you must use the **`usermod`** command with administrative privileges, ensuring the target user is not currently logged in or running processes.
+
+**1. Stop Active Sessions**
+If the user is logged in, terminate their sessions to avoid errors.
+
+sudo pkill -u old_username
+
+
+**2. Rename User and Home Directory**
+Use `usermod` to change the login name, update the home directory path, and move existing files to the new location.
+
+sudo usermod -l new_username -d /home/new_username -m old_username
+
+*   **`-l`**: Specifies the new login name.
+*   **`-d`**: Sets the new home directory path.
+*   **`-m`**: Moves the content of the old home directory to the new one.
+
+**3. Rename Primary Group (Optional)**
+If the user has a private group with the same name as the old username, rename it for consistency.
+
+sudo groupmod -n new_username old_username
+
+
+**4. Verify Changes**
+Confirm the update by checking the user entry and home directory.
+
+getent passwd new_username
+ls -ld /home/new_username
+
+
+**Note:** You cannot rename the account you are currently using.
+Perform these steps while logged in as **root** or another **sudo-enabled** user. 
+For **IdM (FreeIPA)** managed users, changes must be made via the IdM interface or CLI, not just local `usermod`.
+
+
+**************************************************************************
+
+## Changing a Username in RHEL 9 — Detailed Guide
+
+### Prerequisites & Pre-Checks
+
+Before making any changes, verify the current state of the account and ensure no sessions are active:
+
+```bash
+# Check current user details (UID, GID, groups, home, shell)
+id old_username
+
+# Check the /etc/passwd entry
+getent passwd old_username
+
+# Check for any running processes owned by the user
+pgrep -u old_username -a
+
+# Check for active login sessions
+who | grep old_username
+w old_username
+```
+
+If any sessions or processes exist, **terminate them all** before proceeding:
+
+```bash
+sudo pkill -u old_username
+# If processes are stubborn:
+sudo pkill -9 -u old_username
+```
+
+> **Critical:** You **cannot** rename the user you are currently logged in as. Always work from a **root** or **separate sudo-enabled** session.
+
+---
+
+### Step 1 — Rename the Login Name
+
+```bash
+sudo usermod -l new_username old_username
+```
+
+The `-l` (login) flag updates the username in `/etc/passwd` and `/etc/shadow`. **This alone does NOT rename the home directory** — the path in `/etc/passwd` still points to `/home/old_username`.
+
+---
+
+### Step 2 — Move the Home Directory
+
+```bash
+sudo usermod -d /home/new_username -m new_username
+```
+
+| Flag | Purpose |
+|------|---------|
+| `-d /home/new_username` | Sets the new home directory path in `/etc/passwd` |
+| `-m` | **Moves** the contents of the old home directory to the new location (preserves permissions and ownership) |
+
+> **Note:** `-m` only works if the old home directory still exists. If it was already deleted or the path doesn't match, you'll need to move it manually with `mv` first.
+
+---
+
+### Step 3 — Rename the Primary Group
+
+On RHEL 9, `useradd` creates a **private primary group** with the same name as the user by default. If that's the case, rename it for consistency:
+
+```bash
+# Check if a group with the old name exists
+getent group old_username
+
+# If it exists, rename it
+sudo groupmod -n new_username old_username
+```
+
+If the user's primary group is something else (e.g., `users`), skip this step.
+
+---
+
+### Step 4 — Update the GECOS / Comment Field (Optional)
+
+The "real name" or comment field in `/etc/passwd` may still reference the old name:
+
+```bash
+sudo usermod -c "New Full Name" new_username
+```
+
+---
+
+### Step 5 — Fix Remaining References
+
+This is the part most people miss. Several system locations still reference the old username:
+
+#### Crontab
+```bash
+# Check if a crontab exists for the old user
+sudo crontab -u old_username -l 2>/dev/null
+
+# If it does, you must copy it and delete the old one
+sudo cp /var/spool/cron/old_username /var/spool/cron/new_username
+sudo chown new_username:new_username /var/spool/cron/new_username
+sudo rm /var/spool/cron/old_username
+```
+
+#### Mail Spool
+```bash
+# If the user has mail
+sudo mv /var/spool/mail/old_username /var/spool/mail/new_username
+sudo chown new_username:new_username /var/spool/mail/new_username
+```
+
+#### `at` Jobs
+```bash
+# Check for pending at jobs
+atq
+# Delete any jobs belonging to the old user by their job ID
+```
+
+#### Application Configs & Scripts
+Search for any hardcoded references to the old username in configuration files, systemd units, or scripts:
+
+```bash
+sudo grep -r "old_username" /etc/ /opt/ /usr/local/ 2>/dev/null
+```
+
+#### Files Outside the Home Directory
+If the user owned files outside `/home/old_username` (e.g., in `/var/log`, `/opt`, etc.), those files still have the **same UID** (which is good — ownership is preserved by numeric UID). But if you also changed the UID, you'd need:
+
+```bash
+sudo find / -uid <old_uid> -exec chown new_username {} \;
+```
+
+---
+
+### Step 6 — Verify Everything
+
+```bash
+# Confirm the new entry in /etc/passwd
+getent passwd new_username
+
+# Confirm the group
+getent group new_username
+
+# Confirm UID/GID
+id new_username
+
+# Confirm home directory exists and is owned correctly
+ls -ld /home/new_username
+
+# Confirm the old name is gone
+getent passwd old_username   # should return nothing
+```
+
+---
+
+### Step 7 — Test the New Account
+
+Log out and log back in as `new_username`. Verify:
+- Home directory is accessible
+- Shell works correctly
+- Sudo works (if applicable): `sudo -l`
+- Any critical applications or services function properly
+
+---
+
+### Common Pitfalls & Caveats
+
+| Issue | Detail |
+|-------|--------|
+| **`usermod: user is currently used by process`** | Kill all processes for the user first, or reboot and run from single-user/recovery mode |
+| **`usermod: no changes`** | The new name may already exist, or the old name was already updated |
+| **IdM / FreeIPA managed users** | On RHEL 9 joined to an **Identity Management (IdM)** domain, local `usermod` changes will be **overwritten** on next sync. Use `idm user-mod` instead: `sudo idm user-mod --first=New --last=Name old_username` |
+| **SELinux contexts** | Moving the home directory with `-m` should preserve SELinux labels, but verify with `ls -Z /home/new_username` if you use SELinux enforcing mode |
+| **Backup first** | Always back up `/etc/passwd`, `/etc/shadow`, `/etc/group`, and `/etc/gshadow` before making changes: `sudo cp /etc/passwd /etc/passwd.bak` |
+| **Username conventions** | `usermod` is less strict than `useradd` about naming rules, but stick to lowercase alphanumeric + hyphens/underscores, starting with a letter, max 32 chars |
+
+---
+
+### Quick Reference (One-Liner)
+
+If you want to do it all in one shot (after ensuring the user is logged out):
+
+```bash
+sudo usermod -l new_username -d /home/new_username -m old_username && \
+sudo groupmod -n new_username old_username && \
+sudo usermod -c "New Full Name" new_username
+```
+
+Then handle crontabs, mail spool, and config files manually as described above.
+
+
+
