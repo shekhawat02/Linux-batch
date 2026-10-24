@@ -1,0 +1,102 @@
+## UID/GID Ranges in RHEL — Detailed Breakdown
+
+### Core Ranges (RHEL 7+)
+
+Defined in `/etc/login.defs`:
+
+| Range | Purpose | Notes |
+
+| **0** | `root` | Intrinsic; never reassign |
+| **1–200** | Static system users | Hardcoded by the distro (e.g. `bin`=1, `daemon`=2, `httpd`=48, `sshd`=74). Listed in `/usr/share/doc/setup/uidgid` |
+| **201–999** | Dynamic system users | Allocated by `useradd -r` or RPM `%user` directives when a package needs a new service account. Grows over time as packages are installed |
+| **1000–60000** | Regular users | `UID_MIN`/`UID_MAX` (and `GID_MIN`/`GID_MAX`). First free UID at or above `UID_MIN` is picked by `useradd` |
+| **65534** | `nobody` / `nfsnobody` | Kernel overflow user; used by NFS, some daemons |
+
+> **Historical note:** RHEL 5 and 6 used `UID_MIN = 500` (system range 1–499). RHEL 7 moved this to **1000** to align with Debian and avoid collisions with packages that allocate UIDs in the 500–999 range.
+
+### Reserved ID List
+
+The file `/usr/share/doc/setup/uidgid` (or `/usr/share/doc/initscripts/uidgid` on older releases) documents every statically-assigned system UID and GID. Red Hat **strongly recommends** starting new local users at **5000** (by setting `UID_MIN`/`GID_MIN` in `/etc/login.defs`) because the reserved range can grow with future package updates.
+
+```
+# /etc/login.defs
+UID_MIN    1000      # change to 5000 for safety
+UID_MAX    60000
+GID_MIN    1000
+GID_MAX    60000
+SYS_UID_MIN   201
+SYS_UID_MAX   999
+SYS_GID_MIN   201
+SYS_GID_MAX   999
+```
+
+### systemd-Defined Ranges (RHEL 8+)
+
+`systemd` reserves several additional ranges at **compile time** (not configurable via `/etc/login.defs`):
+
+| Range | Count | Purpose |
+|---|---|---|
+| **60001–60513** | 513 | **systemd-homed** — human users whose encrypted home directories are managed by `systemd-homed.service`. UIDs are derived from a hash of the username for stability |
+| **60514–65534** | ~5000 | **Mapped users** — used by `systemd-homed` UID mapping for containerized home directories |
+| **61184–65519** (`0xEF00`–`0xFFEF`) | 4336 | **Dynamic users** — auto-created and destroyed per-process by `DynamicUser=yes` in systemd service units |
+| **524288–1878982656** | ~1.8 B | **Container users** — the floor for subordinate ID (`subuid`/`subgid`) ranges used by rootless containers (Podman, LXC, etc.) |
+
+You can inspect these on a running system with:
+```bash
+userdbctl
+```
+which prints the full disposition table (intrinsic → system → homed → mapped → dynamic → nobody → container).
+
+### IdM (FreeIPA) DNA ID Ranges
+
+When a host is managed by Red Hat Identity Management (IdM/FreeIPA), UID/GID assignment is **centralized** via the **Distributed Numeric Assignment (DNA)** plugin in Directory Server:
+
+- During `ipa-server-install`, a **local domain ID range** (`ipa-local`) is **randomly selected** from 10,000 possible 200,000-ID slices. This randomization reduces collision risk if two IdM domains are later merged.
+- Each **replica** (IdM server) gets its own **DNA sub-range** within that IdM range, so replicas never hand out the same UID.
+- **RID ranges** (used for Windows SID generation) are assigned alongside each POSIX ID range:
+  - Primary RID base (e.g. `300000`)
+  - Secondary RID base (e.g. `1300000`)
+- You can inspect and manage ranges with:
+  ```bash
+  ipa idrange-list
+  ipa idrange-add IDM.EXAMPLE.COM_new --base-id 5000 --range-size 1000 \
+      --rid-base 300000 --secondary-rid-base 1300000
+  ipa-idrange-fix --rangegap 300000 --minrange 20 --ridoffset 200000
+  ```
+- **Key rule:** Never set an IdM ID range that includes UID ≤ 1000 or UID 0. SSSD does not handle UID 0.
+
+### SSSD `min_id` / `max_id`
+
+On **clients**, SSSD filters which remote IDs it returns. In `/etc/sssd.conf`:
+
+```ini
+[domain/example.com]
+id_provider = ipa
+min_id = 1000
+max_id = 200000
+```
+
+- **Default `min_id` is 1** — Red Hat recommends raising it to **1000** to avoid SSSD returning remote system UIDs that collide with local `/etc/passwd` entries.
+- If a remote user's UID falls below `min_id`, SSSD **ignores** that entry entirely (the user cannot log in).
+- For AD trust domains, SSSD uses **ID mapping** (SID → UID) via `ldap_idmap_range_min`/`max` (default 200000–2147483647), which is separate from the POSIX `min_id`.
+
+### Subordinate IDs (subuid / subgid)
+
+For **rootless containers** and user namespaces:
+
+- `/etc/subuid` and `/etc/subgid` assign each user a range of subordinate UIDs/GIDs (default: 65536 IDs starting at 100000).
+- For **systemd-homed** users, the subuid range must fall within **524288–1878982656** (the container user range).
+- IdM can auto-assign subID ranges:
+  ```bash
+  ipa config-mod --user-default-subid=True
+  ipa user-subids --add-user jsmith
+  ```
+
+### Practical Recommendations
+
+1. **Start local users at 5000** (`UID_MIN`/`GID_MIN` in `/etc/login.defs`) to leave room for future system package allocations in 1000–4999.
+2. **Set `min_id = 1000`** in `sssd.conf` on all IdM/AD clients.
+3. **Do not raise `SYS_UID_MAX` above 999** — it breaks the PAM boundary that tells `sssd` to skip system-range UIDs for remote authentication.
+4. **Use `userdbctl`** (RHEL 8+) to see the full picture of all UID ranges in use, including homed, dynamic, and container users.
+5. For **IdM deployments**, back up before running `ipa-idrange-fix`, and always leave a `--rangegap` (e.g. 300000) between ranges to allow future expansion.
+
