@@ -1,0 +1,423 @@
+Here is a hands-on workbook for practicing User and Group Administration in Red Hat Enterprise Linux 9 (RHEL 9). It includes lab objectives, step-by-step tasks, command exercises, expected results, and assessment questions.
+
+Unix SysAdmn (@UnixSysAdmin) on X
+
+[x.com](<https://x.com/UnixSysAdmin?utm_source=chatgpt.com>)
+
+# RHEL 9 User Administration
+
+Hands-on Lab Workbook · Beginner to Intermediate · 10 Practical Labs
+
+## Workbook overview
+
+- Objective: Learn to create, modify, secure, and delete local users and groups.
+- Environment: RHEL 9 virtual machine or lab server.
+- Privileges: A user account with `sudo` access.
+- Estimated duration: 3–4 hours.
+- Safety: Use a test VM, not a production server.
+
+## Lab 1 — Prepare your environment
+
+Objective: Verify the operating system and administrative access.
+
+Run the following commands:
+
+bash
+
+```
+cat /etc/redhat-release
+whoami
+id
+sudo -v
+```
+
+Check whether your account has administrative privileges:
+
+bash
+
+```
+sudo -l
+```
+
+Tasks
+
+- [x]Confirm that the operating system is RHEL 9.
+- [x]Identify your current username and UID.
+- [x]Verify that `sudo` works.
+
+Record your results
+
+- RHEL version: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+- Current username: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+- Current UID: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+## Lab 2 — Create local users
+
+Objective: Create user accounts with home directories and login shells.
+
+Create two test users:
+
+bash
+
+```
+sudo useradd -m -s /bin/bash trainee1
+sudo useradd -m -s /bin/bash trainee2
+```
+
+Set their passwords:
+
+bash
+
+```
+sudo passwd trainee1
+sudo passwd trainee2
+```
+
+Verify the accounts:
+
+bash
+
+```
+id trainee1
+id trainee2
+ls -ld /home/trainee1 /home/trainee2
+getent passwd trainee1
+```
+
+Expected result: Both users exist, have home directories, and use Bash as their login shell.
+
+Practice questions
+
+1. What does `-m` do?
+2. What does `-s /bin/bash` specify?
+3. Which command displays a user's UID and group memberships?
+
+Your answers: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+## Lab 3 — Modify user accounts
+
+Objective: Change account settings.
+
+Change `trainee1`'s login shell:
+
+bash
+
+```
+sudo usermod -s /bin/sh trainee1
+getent passwd trainee1
+```
+
+Change the shell back:
+
+bash
+
+```
+sudo usermod -s /bin/bash trainee1
+```
+
+Create a new home directory path for a test account only if you are prepared to handle the directory migration. For this exercise, inspect the current home directory instead:
+
+bash
+
+```
+sudo usermod -c "Linux Lab Trainee" trainee1
+getent passwd trainee1
+```
+
+Tasks
+
+- [x]Change a user's shell.
+- [x]Restore the Bash shell.
+- [ ]Set and verify the account's descriptive comment.
+
+Challenge: Find the command option used to change an existing user's login name.
+
+Answer: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+## Lab 4 — Manage groups and memberships
+
+Objective: Create groups and assign users to them.
+
+Create two groups:
+
+bash
+
+```
+sudo groupadd developers
+sudo groupadd testers
+```
+
+Add users to supplementary groups:
+
+bash
+
+```
+sudo usermod -aG developers trainee1
+sudo usermod -aG testers trainee2
+sudo usermod -aG testers trainee1
+```
+
+Verify membership:
+
+bash
+
+```
+groups trainee1
+groups trainee2
+id trainee1
+getent group developers
+getent group testers
+```
+
+Expected membership:
+
+| User | Supplementary groups |
+| --- | --- |
+| `trainee1` | `developers`, `testers` |
+| `trainee2` | `testers` |
+
+Important: Never omit `-a` when your intention is to append a supplementary group using `usermod -G`.
+
+## Lab 5 — Password management and aging
+
+Objective: Practice account password administration.
+
+Set or reset a test user's password:
+
+bash
+
+```
+sudo passwd trainee1
+```
+
+Inspect password status and aging settings:
+
+bash
+
+```
+sudo passwd -S trainee1
+sudo chage -l trainee1
+```
+
+Require a password change at the next login:
+
+bash
+
+```
+sudo chage -d 0 trainee1
+sudo chage -l trainee1
+```
+
+Set a maximum password age of 90 days:
+
+bash
+
+```
+sudo chage -M 90 trainee1
+```
+
+Verify:
+
+bash
+
+```
+sudo chage -l trainee1
+```
+
+Tasks
+
+- [ ]Reset a test user's password.
+- [ ]Inspect password aging.
+- [ ]Require a password change at next login.
+- [ ]Set a maximum password age.
+
+## Lab 6 — Lock and unlock a user account
+
+Objective: Practice password-based account locking.
+
+Lock the test account:
+
+bash
+
+```
+sudo passwd -l trainee2
+sudo passwd -S trainee2
+```
+
+Unlock it:
+
+bash
+
+```
+sudo passwd -u trainee2
+sudo passwd -S trainee2
+```
+
+Questions
+
+1. Which command locks a user's password?
+2. Which command unlocks it?
+3. Does password locking guarantee that all authentication methods are blocked?
+
+Answer: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Remember that password locking does not necessarily block SSH key authentication or end existing sessions. For stronger access restrictions, configure the appropriate account and authentication controls.
+
+## Lab 7 — Grant sudo access through `wheel`
+
+Objective: Understand administrative group membership.
+
+First inspect the current configuration:
+
+bash
+
+```
+getent group wheel
+sudo grep -E '^[[:space:]]*%wheel' /etc/sudoers
+```
+
+Add `trainee1` to the `wheel` group:
+
+bash
+
+```
+sudo usermod -aG wheel trainee1
+```
+
+Verify:
+
+bash
+
+```
+id trainee1
+```
+
+Validate the sudo configuration:
+
+bash
+
+```
+sudo visudo -c
+```
+
+On a standard RHEL 9 configuration, membership in `wheel` grants sudo privileges when the corresponding sudoers rule is enabled. Verify that rule before relying on it.
+
+Security task: Remove the user's administrative membership after the exercise:
+
+bash
+
+```
+sudo gpasswd -d trainee1 wheel
+```
+
+## Lab 8 — Explore critical configuration files
+
+Objective: Identify where local account and group information is stored.
+
+Inspect selected records:
+
+bash
+
+```
+grep '^trainee1:' /etc/passwd
+sudo grep '^trainee1:' /etc/shadow
+grep '^developers:' /etc/group
+grep -E '^(UID_MIN|GID_MIN)' /etc/login.defs
+```
+
+| File | Purpose |
+| --- | --- |
+| `/etc/passwd` | Local account records |
+| `/etc/shadow` | Password hashes and password-aging data |
+| `/etc/group` | Local group definitions and supplementary membership lists |
+| `/etc/login.defs` | Defaults used by account and password-management utilities |
+
+Exercise: Identify the fields representing the UID, primary GID, home directory, and login shell in the `trainee1` entry in `/etc/passwd`.
+
+## Lab 9 — Delete users and groups safely
+
+Objective: Remove test accounts and groups.
+
+Before deletion, inspect the account:
+
+bash
+
+```
+id trainee2
+sudo find /home/trainee2 -maxdepth 1 -type f -print
+```
+
+Delete the user and its home directory:
+
+bash
+
+```
+sudo userdel -r trainee2
+```
+
+Verify the deletion:
+
+bash
+
+```
+getent passwd trainee2
+```
+
+Delete the remaining test user:
+
+bash
+
+```
+sudo userdel -r trainee1
+```
+
+Delete the test groups after confirming they are no longer needed or assigned:
+
+bash
+
+```
+sudo groupdel developers
+sudo groupdel testers
+```
+
+Caution: `userdel -r` removes the user's home directory and mail spool where applicable. Back up any required files first.
+
+## Lab 10 — Final practical assessment
+
+Complete these tasks without copying the earlier lab commands.
+
+## Practical checklist
+
+0/8 complete
+
+[ ]1. Create a user named analyst with a home directory.
+
+[ ]2. Set the analyst account password.
+
+[ ]3. Create a group named audit.
+
+[ ]4. Add analyst to audit without removing other supplementary groups.
+
+[ ]5. Force analyst to change the password at next login.
+
+[ ]6. Set the account to expire on 2027-01-31.
+
+[ ]7. Verify analyst's UID and groups.
+
+[ ]8. Remove the analyst test account and its home directory.
+
+ Copy assessment answer key
+
+## Completion criteria
+
+You should be able to:
+
+- Create and modify local accounts.
+- Manage primary and supplementary group memberships.
+- Apply password-aging policies.
+- Lock and unlock password authentication.
+- Understand `wheel`-based sudo access.
+- Inspect local account configuration files.
+- Remove test accounts safely.
+
+Instructor note: Perform these exercises on a disposable VM or a designated lab machine. Avoid changing real administrator accounts or production security settings.
