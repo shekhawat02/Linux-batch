@@ -1,0 +1,90 @@
+The `wheel` Group in Linux —
+
+Historical Origin
+
+The name **wheel** comes from **BSD Unix**, where it designated a small circle of trusted administrators allowed to use `su` to become root. 
+On systems with "strict wheel mode" enabled, non-wheel users were denied `su` even if they knew the root password. 
+The name and concept persisted into modern Linux, where it now primarily gates **`sudo`** access rather than `su`.
+
+How It Works Mechanically
+
+Membership in `wheel` alone does **nothing** by itself. The actual privilege grant happens through a rule in `/etc/sudoers`:
+
+%wheel  ALL=(ALL)  ALL
+
+Breaking this down:
+
+| Token | Meaning |
+
+| `%wheel` | Applies to all members of the **wheel** group (`%` = group) |
+| `ALL`    | On all hosts |
+| `(ALL)`  | Can run commands as **any** user (typically root) |
+| `ALL`    | Can run **any** command |
+
+When a user runs `sudo <command>`, the `sudo` daemon checks the kernel's process credentials for the user's supplementary group list.  
+If the `wheel` GID is present **and** the sudoers rule is active, the command executes with elevated privileges.
+The user's own password (not root's) is typically required for authentication.
+
+Distribution Differences
+
+The functional difference between `wheel` and `sudo` as group names is **exactly zero** — they are just labels pointing to a sudoers rule.
+
+| Aspect | `wheel` | `sudo` |
+
+| **Distributions** | RHEL, CentOS, Fedora, Rocky, AlmaLinux, Arch, openSUSE | Ubuntu, Debian, Linux Mint, Pop!_OS |
+| **Typical GID**   | 10                                                     | 27                                  |
+| **Origin**        | BSD Unix tradition                                     | Debian's own naming for clarity     |
+| **sudoers line**  | `%wheel ALL=(ALL) ALL`                                 | `%sudo ALL=(ALL:ALL) ALL`           |
+| **Purpose**       | Grant sudo access                                      | Grant sudo access                   |
+
+> **Arch Linux** ships with the `wheel` group but does **not** enable the sudoers rule by default — you must configure it explicitly.
+
+Managing Wheel Members
+
+# Add a user to the wheel group
+sudo usermod -aG wheel username
+
+# Alternative (equivalent)
+sudo gpasswd -a username wheel
+
+# Remove a user from the wheel group
+sudo gpasswd -d username wheel
+
+# Verify group membership
+id username
+groups username
+
+Important: The `-a` (append) flag is critical. Without it, `usermod -G` would **replace** the user's entire supplementary group list, potentially removing them from other groups.
+
+Security Hardening Options
+
+**1. Passwordless sudo** (use sparingly, e.g., on build servers):
+
+sudo visudo -f /etc/sudoers.d/wheel-nopasswd
+
+%wheel  ALL=(ALL)  NOPASSWD: ALL
+
+**2. Restrict which commands wheel members can run:**
+
+sudo visudo -f /etc/sudoers.d/wheel-limited
+
+%wheel  ALL=(ALL)  /usr/bin/systemctl restart *, /usr/bin/systemctl status *, /usr/bin/journalctl
+
+**3. Prevent wheel members from changing the root password:**
+
+%wheel ALL=(ALL) ALL, !/usr/bin/passwd root
+
+**4. PAM integration — restrict `su` to wheel members only:**
+
+In `/etc/pam.d/su`, uncomment:
+
+auth  required  pam_wheel.so use_uid
+
+This ensures only wheel members can use `su` to switch to root, even if they know the root password.
+
+### Key Takeaways
+
+- **`wheel` is a coarse administrative role** — all members get the same level of access defined by the sudoers rule. For granular, per-user or per-command control, use explicit entries in `/etc/sudoers.d/`.
+- **Always edit sudoers with `visudo`**, never a plain text editor — a syntax error can lock everyone out of `sudo`.
+- The group is a **convention, not a kernel feature**. You could name it anything; what matters is that the group name in sudoers matches the actual group name on the system.
+
