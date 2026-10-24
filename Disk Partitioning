@@ -1,0 +1,50 @@
+The absolute minimum partitions required for a Red Hat Enterprise Linux installation are a **root partition (/)** and a **swap partition**.
+While the installer can technically proceed with just these two, Red Hat strongly recommends creating additional partitions for **/boot**, **/home**, and **/var** to ensure system security, 
+reliability, and easier maintenance.
+
+For specific size recommendations:
+*   **Root (/)**: Minimum **10 GiB** is recommended to install multiple package groups, though a minimal installation can fit in 5 GiB.
+*   **Swap**: Recommended size depends on RAM; generally **equal to RAM** for systems with 2–8 GiB, and **4 GiB to 0.5x RAM** for systems with 8–64 GiB.
+*   **Boot**: Recommended **1 GiB** for modern systems (RHEL 7+), though older versions suggested 250 MB.
+*   **Home**: Recommended to use remaining space or at least **100 MB** to separate user data from system files.
+*   **EFI/PReP**: UEFI systems require a **500 MiB** EFI partition, and IBM Power Systems require a **4–8 MiB** PReP partition.
+
+A minimum of **10 GiB** of total disk space is required for the installation itself.
+
+******************S_W_A_P*******************
+swap memory assign parameter
+
+The primary parameter controlling how aggressively the Linux kernel moves data from **RAM** to **swap space** is **`vm.swappiness`**. 
+This value ranges from **0 to 100**, where **0** instructs the kernel to avoid swapping unless absolutely necessary, and **100** forces aggressive swapping.
+The default value is typically **60**, but for systems with sufficient RAM, a lower value (e.g., **10**) is often recommended to keep data in faster memory.
+
+You can view the current setting using:
+
+cat /proc/sys/vm/swappiness
+
+
+To temporarily change it for the current session:
+
+sudo sysctl vm.swappiness=10
+
+
+To make the change persistent across reboots, add the following line to **`/etc/sysctl.conf`**:
+
+vm.swappiness=10
+
+
+In **Kubernetes** environments, swap behavior is managed via the **`memorySwap.swapBehavior`** setting in the **KubeletConfiguration**, 
+which allows administrators to define how swap limits are calculated for containers.
+
+Swap Size Parameter's ==> Swap allocation table.
+
+| RAM         | Swap |
+
+| ≤ 4 GB      | 2 GB  |
+| 4 – 16 GB   | 4 GB  |
+| 16 – 64 GB  | 8 GB  |
+| 64 – 256 GB | 16 GB |
+
+> **RHEL 5 guideline** — modern RHEL 7+/9 recommends swap = RAM (for ≤ 8 GB systems) or a fixed 4 GB minimum.
+
+
