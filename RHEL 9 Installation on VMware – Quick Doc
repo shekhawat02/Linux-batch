@@ -1,0 +1,106 @@
+1. Prerequisites
+
+| Item | Value |
+
+| ISO      | `rhel-9.x-x86_64-dvd.iso` from [access.redhat.com](https://access.redhat.com/downloads) |
+| CPU      | 2 vCPUs |
+| RAM      | 4 GB (min 2 GB) |
+| Disk     | 40 GB |
+| Network  | NAT (Workstation) or VM Network (ESXi) |
+
+**Verify the ISO checksum** before use:
+
+> sha256sum rhel-9.x-x86_64-dvd.iso
+
+2. Create the VM
+
+### VMware Workstation
+
+1. **File → New Virtual Machine** → **Typical** → Next
+2. **I will install the OS later** → Next
+3. Guest OS: **Linux** → **Red Hat Enterprise Linux 9 64-bit** → Next
+4. Name: `RHEL9-VM` → choose storage path → Next
+5. Disk: **40 GB**, single file → Next
+6. **Customize Hardware**:
+   - Memory: **4 GB**
+   - Processors: **2**
+   - CD/DVD: **Use ISO image file** → browse to your RHEL 9 ISO
+   - Network: **NAT** (default)
+7. Click **Finish**
+
+### VMware ESXi / vSphere
+
+1. **New Virtual Machine** → **Create a new virtual machine**
+2. Guest OS: **Linux** → **Red Hat Enterprise Linux 9 (64-bit)**
+   > ⚠️ Requires **hardware version 18+** (ESXi 7.0 U3+). If not available, select **RHEL 8** as guest OS — it works fine.
+3. Hardware: CPU **2**, RAM **4 GB**, Disk **40 GB** (thin)
+4. CD/DVD: **Datastore ISO file** → browse to ISO → check **Connect at power on**
+5. **Finish**
+
+## 3. Boot & Install
+
+1. **Power on** the VM
+2. At the GRUB menu, select **"Install Red Hat Enterprise Linux 9"** → Enter
+3. **Language**: English → **Continue**
+
+In the **Installation Summary** screen, configure these four items:
+
+### a) Installation Destination
+- Select your virtual disk (e.g. *40 GiB VMware Virtual Disk*)
+- Storage Configuration: **Automatic** (default LVM layout is fine)
+- Click **Done**
+
+> ⚠️ The disk will be **erased**. On a VM this is fine, but if you're reusing a disk with an existing OS, back up first.
+
+### b) Software Selection
+- Base Environment: **Minimal Install** (recommended) or **Server with GUI**
+- Click **Done**
+
+> ⚠️ Pick **Minimal Install** for servers. You can always add packages later with `dnf`.
+
+### c) Network & Hostname
+- Enable the network adapter (toggle ON)
+- Set a hostname (e.g. `rhel9vm.local`)
+- Click **Done**
+
+### d) Root Password & User
+- Set a **root password**
+- Click **Create User** → enter name, username, password → check **Make this user an administrator**
+- Click **Done**
+
+> ⚠️ **Set both** root password AND an admin user. Anaconda won't warn you if you skip either — you'll be locked out.
+
+
+## 4. Begin Installation
+
+1. Click **Begin Installation**
+2. Wait 5–10 minutes
+3. Click **Reboot System**
+4. **Detach the ISO** before it reboots (Workstation: CD/DVD → Disconnect; ESXi: uncheck *Connect at power on*)
+
+> ⚠️ If you forget to detach the ISO, the VM will **boot back into the installer**. Just power off, detach, and power on again.
+
+## 5. Post-Install
+
+# Verify
+uname -r          # 5.14.0-xxx.el9.x86_64
+getenforce        # Enforcing
+ip a              # Check IP
+
+# Register (if you skipped during install)
+subscription-manager register
+
+# Update
+dnf update -y
+
+> ⚠️ **Don't skip registration** — without it, `dnf update` won't pull security patches.
+
+## 6. (Optional) Install VMware Tools / Open VM Tools
+
+sudo dnf install -y open-vm-tools
+sudo systemctl enable --now vmtoolsd
+
+This gives you **shared clipboard**, **drag-and-drop**, and **automatic display resolution** in Workstation.
+
+That's it. Total time: ~10–15 minutes.
+
