@@ -1,0 +1,20 @@
+
+What is /usr?
+
+/usr stands for Unix System Resources. It contains all user-land applications, libraries, and files that are not strictly required for the core operating system to boot.
+• ⚠️ Important: It is not for your personal files. Your personal documents, pictures, and settings belong in /home/username.
+
+Core Structure Reference
+
+• 📂 /usr/bin — User Apps: Contains standard user applications and command-line tools (e.g., python3, git, curl, nano).
+• 📂 /usr/sbin — Admin Tools: Contains system administration tools that usually require sudo/root access (e.g., sshd, iptables).
+• 📂 /usr/lib — Libraries: Stores shared code libraries (.so files) that your programs need to run properly.
+• 📂 /usr/local — Custom Installs: The safe zone where you put software you compile or install manually, ensuring system package updates won't overwrite it.
+• 📂 /usr/share — Shared Data: Holds data that works across different computer architectures, like application icons, fonts, themes, and documentation (man pages).
+• 📂 /usr/include — C/C++ Headers: Contains header files (.h) needed if you are compiling software from source code.
+
+3 Rules of Thumb for /usr
+
+1. Look, don't touch: Files inside /usr are managed automatically by your package manager (apt, dnf, pacman). Do not manually delete or edit files here unless you are using /usr/local.
+2. Read-Only by design: Regular users cannot write to /usr. You must use sudo to make any modifications.
+3. The Modern Link: On modern Linux systems (Ubuntu, Fedora, Arch), the root directories /bin and /lib are just shortcuts (symlinks) pointing directly to /usr/bin and /usr/lib.
