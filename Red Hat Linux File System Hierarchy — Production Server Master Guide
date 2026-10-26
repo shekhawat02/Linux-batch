@@ -1,0 +1,778 @@
+# Red Hat Linux File System Hierarchy — Production Server Master Guide
+
+Think of this as your Linux production-server recall handbook. The goal is to help you remember the directory structure, understand where files belong, troubleshoot issues, and work safely on Red Hat Enterprise Linux (RHEL) production servers.
+
+You should be able to answer four questions whenever you encounter a directory:
+
+1. What is this directory used for?
+2. Which files or services depend on it?
+3. How do I inspect it during troubleshooting?
+4. What can go wrong if I change or delete something inside it?
+
+We will cover the filesystem hierarchy, important files, practical commands, troubleshooting workflows, and production safety rules.
+
+## 1. Understand the complete directory tree
+
+## / — Root of the filesystem
+
+Every absolute path starts here.
+
+/etc
+
+System and service configuration
+
+Examples: `/etc/ssh/sshd_config`, `/etc/fstab`
+
+/var
+
+Logs, caches, queues and changing application data
+
+Examples: `/var/log`, `/var/lib`, `/var/cache`
+
+/usr
+
+Most installed programs, libraries and shared resources
+
+Examples: `/usr/bin`, `/usr/sbin`, `/usr/lib64`
+
+/home and /root
+
+User home directories and the root administrator's home
+
+/boot and /boot/efi
+
+Bootloader, kernel-related files and EFI boot files where applicable
+
+/dev, /proc, /sys, /run
+
+Devices and kernel, process, hardware, and runtime information
+
+/opt, /srv, /mnt, /media, /tmp
+
+Optional software, service data, mount points, removable media and temporary files
+
+Remember this sentence:
+
+`/etc` configures, `/usr` provides programs, `/var` changes, `/home` belongs to users, `/boot` starts the system, and `/proc` and `/sys` expose live system information.
+
+The exact directory contents depend on the RHEL release, installed software, and system configuration. Some directories are symbolic links, and some are separate filesystems or mount points.
+
+## 2. Every important directory and what you must remember
+
+The following table is your core reference for production work. The hierarchy follows the Filesystem Hierarchy Standard (FHS), with RHEL-specific operational examples.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://specifications.freedesktop.org\&sz=32)
+
+Freedesktop Specifications
+
++1
+
+
+
+| Directory        | Purpose                                                          | Production use                                    |
+| ---------------- | ---------------------------------------------------------------- | ------------------------------------------------- |
+| `/`              | Root of filesystem                                               | Check root filesystem capacity                    |
+| `/bin`           | Essential commands; often merged into `/usr/bin`                 | Run basic commands                                |
+| `/sbin`          | Essential administration commands; often merged into `/usr/sbin` | System recovery and administration                |
+| `/boot`          | Kernel, initramfs and bootloader-related files                   | Kernel and boot troubleshooting                   |
+| `/boot/efi`      | EFI System Partition mount point, when applicable                | UEFI boot troubleshooting                         |
+| `/dev`           | Device files                                                     | Disk and terminal devices                         |
+| `/etc`           | System configuration                                             | SSH, networking, users, mounts                    |
+| `/home`          | Regular users' home directories                                  | User files and SSH keys                           |
+| `/root`          | Root administrator's home                                        | Root shell configuration and administrative files |
+| `/lib`, `/lib64` | Essential libraries; may be symlinks                             | Runtime and library dependencies                  |
+| `/media`         | Removable media mount points                                     | Removable devices                                 |
+| `/mnt`           | Temporary/manual mount point                                     | Filesystem maintenance                            |
+| `/opt`           | Optional or third-party software                                 | Vendor application installations                  |
+| `/proc`          | Virtual process and kernel information                           | Process and memory diagnostics                    |
+| `/root`          | Root user's home directory                                       | Administrator-specific files                      |
+| `/run`           | Volatile runtime state, generally cleared at boot                | PID files, sockets, service runtime state         |
+| `/srv`           | Data served by system services                                   | Site-specific service content                     |
+| `/sys`           | Kernel device and subsystem information                          | Hardware and driver diagnostics                   |
+| `/tmp`           | Temporary files                                                  | Short-lived application files                     |
+| `/usr`           | Installed programs, libraries and resources                      | Software and command locations                    |
+| `/usr/local`     | Locally installed software                                       | Organization-managed tools                        |
+| `/var`           | Changing system and application data                             | Logs, queues, state, caches                       |
+| `/var/tmp`       | Temporary files that can persist across reboots                  | Longer-lived temporary data                       |
+
+Production caution: `/bin`, `/sbin`, `/lib` and `/lib64` may be symbolic links into `/usr` on modern RHEL systems. Never assume every directory is a separate physical directory or partition. Verify the actual system.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://specifications.freedesktop.org\&sz=32)
+
+Freedesktop Specifications
+
++1
+
+
+
+## 3. The `/etc` directory — configuration you must know
+
+`/etc` is one of the most important directories for a Linux administrator. It contains host-specific configuration for the operating system and installed services.
+
+### Critical `/etc` files
+
+/etc/fstab
+
+Persistent filesystem mount definitions
+
+/etc/hosts
+
+Local hostname-to-IP mappings
+
+/etc/hostname
+
+Configured system hostname on typical RHEL installations
+
+/etc/resolv.conf
+
+DNS resolver configuration; may be generated or managed
+
+/etc/passwd
+
+User account records; passwords are not stored here
+
+/etc/shadow
+
+Password hashes and password-aging information; restricted access
+
+/etc/group
+
+Group definitions
+
+/etc/gshadow
+
+Restricted group security information
+
+/etc/sudoers
+
+Sudo policy; edit using visudo
+
+/etc/sudoers.d/
+
+Additional sudo policy files
+
+/etc/ssh/sshd_config
+
+SSH server configuration
+
+/etc/ssh/ssh_config
+
+SSH client configuration
+
+/etc/hosts.allow
+
+Legacy TCP Wrappers configuration; not a general modern RHEL firewall control
+
+/etc/chrony.conf
+
+Chrony time-synchronization configuration
+
+/etc/rsyslog.conf
+
+Main rsyslog configuration, if rsyslog is installed
+
+/etc/logrotate.conf
+
+Main log rotation configuration
+
+/etc/logrotate.d/
+
+Application-specific log rotation rules
+
+/etc/security/limits.conf
+
+PAM limits configuration; drop-ins may also apply
+
+/etc/sysctl.conf
+
+Sysctl settings; drop-ins under /etc/sysctl.d/ may also apply
+
+/etc/selinux/config
+
+Persistent SELinux mode and policy configuration
+
+/etc/NetworkManager/
+
+NetworkManager connection and daemon configuration
+
+/etc/cron.d/
+
+System cron schedules
+
+/etc/crontab
+
+System-wide cron table
+
+/etc/systemd/system/
+
+Administrator-defined systemd units and overrides
+
+### Essential commands for `/etc`
+
+```
+# Inspect a configuration file
+less /etc/fstab
+
+# Show file permissions and ownership
+ls -l /etc/ssh/sshd_config
+
+# Find the configuration that systemd actually loads
+systemctl cat sshd
+
+# Check whether a file belongs to an installed RPM
+rpm -qf /etc/ssh/sshd_config
+
+# Find configuration files containing a keyword
+grep -Rni "keyword" /etc/ssh/
+```
+
+The `grep` command above is an example; replace `keyword` with a real search term. Recursive searches can encounter generated files, permission errors, and sensitive configuration, so restrict searches to the relevant directories.
+
+### Production change procedure
+
+Before editing any configuration file:
+
+1. Confirm the correct server, environment, and change ticket.
+2. Read the existing configuration and identify its owner.
+3. Back up the file, preserving permissions and ownership where needed.
+4. Validate the new configuration using the service's supported test command.
+5. Apply the change during the approved window.
+6. Reload or restart only the affected service when required.
+7. Verify the service, logs, and application behavior.
+8. Keep a tested rollback procedure.
+
+For example, before changing SSH server configuration:
+
+```
+sudo sshd -t
+sudo systemctl status sshd
+```
+
+`sshd -t` checks SSH daemon configuration syntax. It does not prove network reachability or guarantee successful authentication. After an approved change, validate from a separate session before closing your existing administrative connection.
+
+Never blindly overwrite `/etc/fstab`, `/etc/shadow`, `/etc/sudoers`, network configuration, or SSH configuration on a production server.
+
+## 4. The `/var` directory — logs, application data and disk-full incidents
+
+When an application fails, logs stop being written, or a server runs out of disk space, `/var` is a primary place to investigate.
+
+| Path                | What to remember                                                     | Common investigation                 |
+| ------------------- | -------------------------------------------------------------------- | ------------------------------------ |
+| `/var/log/`         | System and application logs                                          | Identify errors and failures         |
+| `/var/log/messages` | General system messages on systems using traditional rsyslog logging | Inspect system events                |
+| `/var/log/secure`   | Authentication and security events on typical RHEL configurations    | Investigate login failures           |
+| `/var/log/audit/`   | Audit logs when auditd is configured                                 | Investigate audited events           |
+| `/var/log/cron`     | Cron-related logs when configured                                    | Investigate scheduled jobs           |
+| `/var/cache/`       | Re-creatable application caches in many cases                        | Check cache growth                   |
+| `/var/lib/`         | Persistent application and service state                             | Identify service data before cleanup |
+| `/var/spool/`       | Queued work such as mail or print jobs                               | Investigate queue buildup            |
+| `/var/tmp/`         | Longer-lived temporary files                                         | Investigate temporary storage growth |
+| `/var/crash/`       | Crash dumps if configured                                            | Investigate system crashes           |
+| `/var/www/`         | Common web content location, depending on configuration              | Inspect web content and ownership    |
+| `/var/lib/rpm/`     | RPM database-related storage varies by implementation                | Package database diagnostics         |
+
+These paths are common conventions, not guarantees. Logging may be handled by `systemd-journald`, rsyslog, an application-specific logger, or a centralized logging service. Check what your server actually uses.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://specifications.freedesktop.org\&sz=32)
+
+Filesystem Hierarchy Standard
+
++1
+
+
+
+### Production commands for `/var`
+
+```
+# Check filesystem space
+df -hT
+
+# Check inode usage
+df -ih
+
+# Check size of immediate directories on the root filesystem
+sudo du -xhd1 /var 2>/dev/null
+
+# List the largest items in /var, one filesystem at a time
+sudo du -xah /var 2>/dev/null | sort -h | tail -20
+
+# View recent system journal entries
+sudo journalctl -p warning -n 100 --no-pager
+
+# View the current boot's errors
+sudo journalctl -b -p err --no-pager
+
+# Check a service's recent logs
+sudo journalctl -u sshd -n 100 --no-pager
+```
+
+`-x` keeps `du` from crossing filesystem boundaries. The recursive size commands can be I/O-intensive on large systems, so use them thoughtfully during peak production periods.
+
+### The disk-full problem: an important distinction
+
+Disk blocks exhausted
+
+`df -hT` reports a filesystem at or near 100% capacity. Large logs, application data, backups or deleted-but-open files may be responsible.
+
+Inodes exhausted
+
+`df -ih` reports 100% inode usage. A very large number of small files can exhaust inodes even when disk space remains.
+
+Deleted files still consume space
+
+A process may still hold an open file after it has been unlinked. `df` can report more usage than `du` accounts for.
+
+To investigate deleted-but-open files:
+
+```
+sudo lsof +L1
+```
+
+If the command is available, inspect the process and file details. Do not kill processes or restart production services solely to reclaim space without understanding the impact and obtaining the required approval.
+
+Golden rule: Never run `rm -rf /var/log/*` or delete files under `/var/lib` simply to free space. Use the correct log rotation, retention, queue-management or application-specific cleanup process.
+
+## 5. The `/usr` directory — programs, binaries and libraries
+
+The easiest way to remember `/usr` is: installed software and its supporting resources.
+
+| Directory         | Purpose                                              | Useful command                      |
+| ----------------- | ---------------------------------------------------- | ----------------------------------- |
+| `/usr/bin`        | Most user commands                                   | `command -v ls`                     |
+| `/usr/sbin`       | System administration programs                       | `command -v useradd`                |
+| `/usr/lib`        | Libraries and supporting files                       | `find /usr/lib -maxdepth 1 -type d` |
+| `/usr/lib64`      | Common 64-bit library location on RHEL               | `ls /usr/lib64`                     |
+| `/usr/libexec`    | Helper programs used by other programs               | `ls /usr/libexec`                   |
+| `/usr/share`      | Architecture-independent resources and documentation | `ls /usr/share`                     |
+| `/usr/local/bin`  | Locally installed commands                           | `ls /usr/local/bin`                 |
+| `/usr/local/sbin` | Locally installed administrative commands            | `ls /usr/local/sbin`                |
+| `/usr/src`        | Source code and build-related files when installed   | `ls /usr/src`                       |
+
+### How to locate a command
+
+Suppose you need to find the executable for `systemctl`.
+
+```
+command -v systemctl
+type -a systemctl
+rpm -qf "$(command -v systemctl)"
+```
+
+What each command tells you:
+
+- `command -v` — resolves the command using your shell's command lookup.
+- `type -a` — shows matching aliases, functions or executable locations.
+- `rpm -qf` — identifies the installed RPM package owning the resolved file, when applicable.
+
+For a shared-library problem:
+
+```
+ldd /path/to/program
+```
+
+Only use `ldd` on trusted executables. For an unfamiliar or untrusted executable, use safer static inspection such as `readelf -d /path/to/program` where applicable.
+
+### Production rule
+
+Avoid manually replacing or deleting operating-system files under `/usr/bin`, `/usr/sbin`, `/usr/lib64` or `/lib64`. Use the RHEL package manager and approved patching procedures. Changes to libraries or essential commands can affect multiple services or prevent the system from booting.
+
+## 6. The `/proc`, `/sys`, `/dev` and `/run` directories
+
+These are not ordinary data directories. Much of their content is exposed dynamically by the kernel or created at runtime.
+
+[A Deep Dive into Processes in Operating Systems | by Can Özkan | Medium](https://images.openai.com/static-rsc-4/nKmHD1aLnTbMhVNo2vJMfohhtEnSqtsxt-2k6zJswOAWLaWfl5_7131ydWk5z9auA1mv6ndtTt2t0tkbL7NbugR1-T6aQygKmbY-akSWLtss3At5nf1VRWsBRqEm6BIu5QVnWIvgDBJUd7LSHhW6-yjl2znUDR6UBFMVFJDxexU?purpose=inline)
+
+### `/proc` — Process and kernel information
+
+Examples: `/proc/cpuinfo`, `/proc/meminfo`, `/proc/mounts`, `/proc/PID/status`.
+
+```
+cat /proc/meminfo
+uptime
+ps -ef
+```
+
+Use it to investigate memory, running processes and kernel-exposed state.
+
+[sysfs](https://images.openai.com/static-rsc-4/R56Hz92GorPWo167DTiLpVTVI84PMvIBZ9na1QGn0J28e0l8f1TGt8A_xzKu0rQI5q6lr9ukst6xtL0yDYi0JWTpjDKK6EdMVmFZDvJm8NZQvNYsg3r6tSYGZP1MS-u6YeoHbenYQoFHanUU2NMemAnArtZOFE4Q9o0Z221X1Ig?purpose=inline)
+
+### `/sys` — Devices and kernel subsystems
+
+Examples: `/sys/class/net`, `/sys/block`, `/sys/devices`.
+
+```
+ls /sys/class/net
+ls /sys/block
+```
+
+Use it to inspect interfaces, block devices and hardware-related state. Writing to some sysfs attributes changes live kernel settings.
+
+[lsblk Command Examples in Linux](https://images.openai.com/static-rsc-4/MLHVhqR7AnehLius6YJl2EJekPQPDJXYXNcyp8BNnQSeYt8vjSuJwDfGsJxx9VLHxJ7Wvi9AJxxdo7RTr7Cs38pgA9n2peP9pNXfo1vlZ4NgczTl4T01fBI-afaO5_PcSBiCbMu7fO8R0HYdqAn4RqO6xJHU8O20kKRiLz6YOgc?purpose=inline)
+
+### `/dev` — Device nodes
+
+Examples: `/dev/sda`, `/dev/nvme0n1`, `/dev/mapper/`, `/dev/null`.
+
+```
+lsblk -f
+ls -l /dev/disk/by-uuid/
+```
+
+Use it to map block devices and storage identifiers. Device names vary across systems.
+
+[Linux File Structure Explained](https://images.openai.com/static-rsc-4/c1I0USNUrr5zhtZRV3cdwGjMMUffiHCnbLk2_uN6I6JuAB9sQRJWGzJzJ7Uv4Wq8cwXnLVxVFJx_FtqrULNmnhPe9V7lCVNx3ZVlmfxBy_F2DVD1CxaHDlfNwzyziKQzB3ikPmqJ7kZ99CxFlBsaAGHy7k-9tm6xeuyQUDGZJIc?purpose=inline)
+
+### `/run` — Runtime state
+
+Examples: service sockets, PID files and daemon runtime directories.
+
+```
+ls -la /run
+systemctl --failed
+```
+
+Runtime files are often recreated when services start or the system boots.
+
+Recall test: Which directory would you inspect for a process's status — `/etc`, `/proc`, or `/usr`?
+
+The answer is `/proc`.
+
+## 7. `/boot` — kernel and boot troubleshooting
+
+The boot directory matters when a server fails after a kernel update, has insufficient boot-partition space, or cannot start correctly.
+
+Important items may include:
+
+- `/boot/vmlinuz-*` — installed kernel images.
+- `/boot/initramfs-*.img` — initial RAM filesystem images.
+- `/boot/grub2/` — GRUB configuration and related files on many BIOS-based RHEL installations; UEFI layouts vary.
+- `/boot/loader/entries/` — Boot Loader Specification entries on applicable systems.
+- `/boot/efi/` — EFI System Partition mount point on applicable UEFI installations.
+
+Inspect the actual configuration rather than assuming every server has the same layout:
+
+```
+uname -r
+ls -lh /boot
+df -hT /boot
+findmnt /boot
+findmnt /boot/efi
+```
+
+`uname -r` displays the currently running kernel; it does not necessarily identify the newest installed kernel.
+
+For installed kernels and their packages:
+
+```
+rpm -q kernel
+grubby --default-kernel
+grubby --info=ALL
+```
+
+Never manually delete kernel or initramfs files from `/boot` to resolve a space issue. First identify the active and installed kernels, verify recovery options, and use the supported package-management procedure for the specific RHEL release.
+
+## 8. `/home`, `/root`, `/tmp` and `/opt`
+
+These paths are frequently confused by new administrators.
+
+| Path                | Main distinction                                   | Production concern                                           |
+| ------------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| `/home/user`        | Regular user's home directory                      | User permissions, SSH keys and personal files                |
+| `/root`             | Root administrator's home                          | Sensitive administrative files                               |
+| `/tmp`              | Short-lived temporary files                        | May be cleaned automatically or isolated by service settings |
+| `/var/tmp`          | Temporary files with longer retention expectations | May survive a reboot but can still be cleaned by policy      |
+| `/opt/vendor/`      | Optional or third-party software                   | Vendor installation and upgrade conventions                  |
+| `/opt/vendor/etc/`  | Application configuration, if that layout is used  | Keep configuration backups and access controls               |
+| `/opt/vendor/log/`  | Application logs, if configured there              | Check actual application logging settings                    |
+| `/opt/vendor/data/` | Application data, if configured there              | Back up and protect persistent state                         |
+
+The vendor paths in `/opt` are examples, not a mandatory directory structure.
+
+### Where should application files go?
+
+Use your organization's deployment standard and the software vendor's documented layout. A useful starting point is:
+
+- Executables: package-managed locations, or a designated application installation directory.
+- Host-specific configuration: `/etc` or a documented application-specific configuration location.
+- Persistent application state: the application's designated data directory, often under `/var/lib` or an approved separate data mount.
+- Logs: the configured journal, `/var/log`, or a designated application log location.
+- User-specific files: the relevant user's home directory.
+- Temporary files: `/tmp` or another documented temporary location.
+
+Do not assume that all application data belongs under `/opt`, `/var/www` or `/home`. Check the service unit and application configuration first.
+
+## 9. Storage and mount points — essential production knowledge
+
+Understanding the directory tree is only half the job. You must know which filesystem backs each directory.
+
+A server may have separate filesystems for `/`, `/boot`, `/var`, `/home`, and application data. Other directories may be mounted from SAN storage, NFS, cloud disks or logical volumes.
+
+### Commands you should know by heart
+
+```
+# Filesystem types, usage and mount points
+df -hT
+
+# Inode capacity
+df -ih
+
+# Mounted filesystems and their sources
+findmnt
+
+# Filesystem backing a particular path
+findmnt -T /var/log
+
+# Block devices, filesystem types and UUIDs
+lsblk -f
+
+# Persistent mount definitions
+cat /etc/fstab
+
+# Logical volumes
+sudo lvs
+sudo vgs
+sudo pvs
+```
+
+These storage commands are primarily observational. Use approved change procedures before modifying logical volumes, partitions, filesystems or mount definitions.
+
+### What does `/etc/fstab` do?
+
+It defines filesystems that should be mounted according to configured options, commonly during boot. Entries typically specify:
+
+1. Device, UUID or other filesystem source.
+2. Mount point.
+3. Filesystem type.
+4. Mount options.
+5. Dump setting.
+6. Filesystem-check order.
+
+Inspect the current state before making changes:
+
+```
+findmnt --verify
+findmnt --target /var
+cat /etc/fstab
+```
+
+`findmnt --verify` checks the mount configuration for issues, but it does not prove that every remote filesystem will be available at boot.
+
+A bad `/etc/fstab` entry can cause boot delays, failed mounts or emergency-mode problems. For remote mounts, review network dependencies and boot options carefully.
+
+## 10. Permissions, ownership and SELinux
+
+Production troubleshooting is incomplete if you know the directory but do not understand who can access it.
+
+### Standard Linux permissions
+
+Run:
+
+```
+ls -ld /var/log
+ls -l /etc/ssh/sshd_config
+id
+namei -l /path/to/file
+```
+
+Recall these commands:
+
+| Command    | Meaning                             |
+| ---------- | ----------------------------------- |
+| `ls -l`    | View file permissions and ownership |
+| `chmod`    | Change permission bits              |
+| `chown`    | Change owner or group               |
+| `chgrp`    | Change group ownership              |
+| `umask`    | Set default permission masking      |
+| `getfacl`  | Inspect access control lists        |
+| `setfacl`  | Modify access control lists         |
+| `namei -l` | Inspect permissions along a path    |
+
+A directory requires execute (`x`) permission to traverse it. A file's own permissions are not the only factor: missing execute permission on a parent directory can prevent access.
+
+Avoid using `chmod -R 777` or `chown -R` as a generic fix. Recursive permission changes can expose secrets, break applications and interfere with package or service expectations.
+
+### SELinux on RHEL
+
+SELinux is an additional access-control layer. Correct Unix permissions do not guarantee that a service can access a file.
+
+```
+getenforce
+ls -Zd /var/www/html
+ps -eZ
+sudo ausearch -m AVC -ts recent
+```
+
+These commands help inspect the SELinux mode, file labels, process contexts and recent access denials when the relevant tools and audit records are available.
+
+If a web server cannot read a file, investigate both ordinary permissions and SELinux labels. Prefer correcting the intended file context with the appropriate `semanage fcontext` and `restorecon` workflow when warranted, rather than disabling SELinux.
+
+## 11. The production troubleshooting workflow
+
+Use this sequence whenever an incident involves a failed service, inaccessible file, full disk or unexpected behavior.
+
+1\. Establish context
+
+Confirm the host, environment, incident scope, your access and the change restrictions.
+
+2\. Identify the path
+
+Inspect the file, parent directories, ownership, permissions and symbolic links.
+
+3\. Identify the filesystem
+
+Use findmnt, df and lsblk to discover the actual mount and storage capacity.
+
+4\. Gather evidence
+
+Inspect service status, logs, processes, resource use and relevant security denials.
+
+5\. Determine the cause
+
+Separate symptoms from the underlying cause; avoid untested assumptions.
+
+6\. Plan a controlled fix
+
+Check dependencies, backups, approval, maintenance window and rollback.
+
+7\. Apply and validate
+
+Make the smallest appropriate change and test service health and user impact.
+
+8\. Document the outcome
+
+Record evidence, root cause, actions, verification and follow-up prevention.
+
+### Example: an application cannot write to a directory
+
+Suppose an application reports `Permission denied` for `/var/lib/myapp`.
+
+Start with observations:
+
+```
+namei -l /var/lib/myapp
+stat /var/lib/myapp
+findmnt -T /var/lib/myapp
+df -hT /var/lib/myapp
+df -ih /var/lib/myapp
+getenforce
+sudo journalctl -u myapp -n 100 --no-pager
+```
+
+Replace `myapp` with the actual service name.
+
+Then investigate:
+
+- Is the service running under the expected user and group?
+- Do the directory and its parent directories allow traversal?
+- Is the filesystem mounted read-only?
+- Is the filesystem out of space or inodes?
+- Is an SELinux denial present?
+- Is the application writing to the correct path?
+
+Only after identifying the cause should you change ownership, permissions, mount settings or SELinux policy.
+
+## 12. Production command cheat sheet
+
+Keep these commands familiar. Most are read-only inspection commands, although output can contain sensitive information.
+
+| Requirement                        | Command                               |
+| ---------------------------------- | ------------------------------------- |
+| Display the current directory      | `pwd`                                 |
+| List files, including hidden files | `ls -la`                              |
+| Display a directory tree           | `tree -L 2 /etc`                      |
+| Resolve a symbolic link            | `readlink -f /path`                   |
+| Find files by name                 | `find /var/log -type f -name '*.log'` |
+| Find files modified recently       | `find /var/log -type f -mmin -60`     |
+| Inspect file metadata              | `stat /path/to/file`                  |
+| Identify file type                 | `file /path/to/file`                  |
+| Search file contents               | `grep -n 'ERROR' /path/to/file`       |
+| Check disk usage                   | `df -hT`                              |
+| Check inode usage                  | `df -ih`                              |
+| Check directory sizes              | `du -xhd1 /var`                       |
+| Check failed services              | `systemctl --failed`                  |
+| Inspect service status             | `systemctl status SERVICE`            |
+| Read service logs                  | `journalctl -u SERVICE -n 100`        |
+| Check the current boot's errors    | `journalctl -b -p err`                |
+| Inspect mounts                     | `findmnt`                             |
+| Inspect block devices              | `lsblk -f`                            |
+| Check file owner and mode          | `ls -l /path/to/file`                 |
+| Inspect path permissions           | `namei -l /path/to/file`              |
+| Check SELinux mode                 | `getenforce`                          |
+| Find the package owning a file     | `rpm -qf /path/to/file`               |
+
+`tree` may need to be installed, and `SERVICE` and file paths are placeholders. Use only approved installation procedures on production servers.
+
+## 13. Memorize the hierarchy with active recall
+
+The best way to retain this knowledge is to practice retrieving it without looking at the answer. Use the following mental associations:
+
+Configuration
+
+/etc
+
+Logs and changing data
+
+/var
+
+Installed commands and libraries
+
+/usr
+
+User files
+
+/home
+
+Root administrator's home
+
+/root
+
+Kernel and boot files
+
+/boot
+
+Process and kernel information
+
+/proc
+
+Devices and hardware interfaces
+
+/dev and /sys
+
+Runtime state
+
+/run
+
+Persistent mount definitions
+
+/etc/fstab
+
+Tap a card to reveal the answer. Mark ✓ if you know it or × if you don't, and I'll track your progress.
+
+Where are system-wide configuration files stored?Click × if you don't know it
+
+1 of 10
+
+You can ask me to review these flashcards from any chat, change the deck, or set up a daily review.
+
+## 14. Your recommended learning sequence
+
+Study in this order to become comfortable working around production RHEL servers:
+
+1. Filesystem fundamentals: directory purposes, absolute versus relative paths, symbolic links and mount points.
+2. Configuration: `/etc`, SSH, users, permissions, networking and systemd.
+3. Troubleshooting: `/var/log`, `journalctl`, disk space, inodes and service failures.
+4. Storage: `/etc/fstab`, UUIDs, `lsblk`, LVM and filesystem capacity.
+5. Security: ownership, ACLs, SELinux, sudo and audit logs.
+6. Recovery: boot issues, failed mounts, package recovery and controlled rollback.
+
+For authoritative reference, start with the [Red Hat Enterprise Linux documentation](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/?utm_source=chatgpt.com) and the [Filesystem Hierarchy Standard](https://specifications.freedesktop.org/fhs/latest/?utm_source=chatgpt.com).&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://docs.redhat.com\&sz=32)
+
+Red Hat Documentation
+
++1
+
+
+
+The production mindset to remember: identify the directory, determine what owns it, understand which service depends on it, gather evidence before making changes, and always verify the outcome.
